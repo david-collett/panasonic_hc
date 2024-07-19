@@ -216,8 +216,21 @@ class PanasonicBLEMode(PanasonicBLEParcel):
         )
 
 
+class PanasonicBLEFanMode(PanasonicBLEParcel):
+    def __init__(self, mode):
+        super().__init__(
+            src="APP",
+            dst="I_UNIT1",
+            op="SET",
+            packets=[
+                PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([17, mode, 0, 0]))
+            ],
+        )
+
+
 class PanasonicBLEEnergySaving(PanasonicBLEParcel):
     def __init__(self, state):
+        state = 11 if state else 9
         super().__init__(
             src="APP",
             dst="I_UNIT1",

@@ -195,9 +195,15 @@ class PanasonicHCClimate(ClimateEntity):
     async def async_set_preset_mode(self, preset_mode: str) -> None:
         """Set new preset mode."""
 
-        _LOGGER.warning("Not Implemented")
+        try:
+            await self._thermostat.async_set_energysaving(preset_mode == PRESET_ECO)
+        except PanasonicHCException:
+            _LOGGER.warning("[%s] Failed to set preset", self._thermostat.mac_address)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set fan speed."""
 
-        _LOGGER.warning("Not Implemented")
+        try:
+            await self._thermostat.async_set_fanmode(fan_mode)
+        except PanasonicHCException:
+            _LOGGER.warning("[%s] Failed to set fan mode", self._thermostat.mac_address)

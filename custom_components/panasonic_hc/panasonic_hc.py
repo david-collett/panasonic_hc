@@ -13,6 +13,7 @@ from .panasonic_hc_proto import (
     FANSPEED,
     MODE,
     PanasonicBLEEnergySaving,
+    PanasonicBLEFanMode,
     PanasonicBLEMode,
     PanasonicBLEParcel,
     PanasonicBLEPower,
@@ -157,3 +158,13 @@ class PanasonicHC:
         """Set thermostat mode."""
 
         await self._async_write_command(PanasonicBLEMode(MODE[mode].value))
+
+    async def async_set_fanmode(self, mode: str):
+        """Set thermostat mode."""
+
+        await self._async_write_command(PanasonicBLEFanMode(FANSPEED[mode].value))
+
+    async def async_set_energysaving(self, state: bool):
+        """Toggle EnergySaving mode."""
+
+        await self._async_write_command(PanasonicBLEEnergySaving(state))
