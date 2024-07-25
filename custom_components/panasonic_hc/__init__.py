@@ -15,11 +15,12 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from .const import DOMAIN, SIGNAL_THERMOSTAT_CONNECTED, SIGNAL_THERMOSTAT_DISCONNECTED
 from .panasonic_hc import PanasonicHC, PanasonicHCException
 
-PLATFORMS: list[Platform] = [Platform.CLIMATE]
+PLATFORMS: list[Platform] = [Platform.CLIMATE, Platform.SENSOR]
 
 type PanasonicHCConfigEntry = ConfigEntry[PanasonicHC]  # noqa: F821
 
 _LOGGER = logging.getLogger(__name__)
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Panasonic H&C from a config entry."""
@@ -63,6 +64,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     return unload_ok
 
+
 async def _async_run_thermostat(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Run the thermostat."""
 
@@ -75,13 +77,19 @@ async def _async_run_thermostat(hass: HomeAssistant, entry: ConfigEntry) -> None
             await thermostat.async_get_status()
         except PanasonicHCException as e:
             if not thermostat.is_connected:
-                _LOGGER.error("[%s] PanasonicHC device disconnected", thermostat.mac_address)
+                _LOGGER.error(
+                    "[%s] PanasonicHC device disconnected", thermostat.mac_address
+                )
 
-                async_dispatcher_send(hass, f"{SIGNAL_THERMOSTAT_DISCONNECTED}_{thermostat.mac_address}")
+                async_dispatcher_send(
+                    hass, f"{SIGNAL_THERMOSTAT_DISCONNECTED}_{thermostat.mac_address}"
+                )
                 await _async_reconnect_thermostat(hass, entry)
                 continue
 
-            _LOGGER.error("[%s] Error updating PanasonicHC device %s", thermostat.mac_address, e)
+            _LOGGER.error(
+                "[%s] Error updating PanasonicHC device %s", thermostat.mac_address, e
+            )
 
         await asyncio.sleep(10)
 
@@ -100,6 +108,8 @@ async def _async_reconnect_thermostat(hass: HomeAssistant, entry: ConfigEntry) -
 
         _LOGGER.debug("[%s] PanasonicHC device connected", thermostat.mac_address)
 
-        async_dispatcher_send(hass, f"{SIGNAL_THERMOSTAT_CONNECTED}_{thermostat.mac_address}")
+        async_dispatcher_send(
+            hass, f"{SIGNAL_THERMOSTAT_CONNECTED}_{thermostat.mac_address}"
+        )
 
         return

@@ -3,6 +3,7 @@
 import asyncio
 from collections.abc import Callable
 import logging
+import time
 
 from bleak import BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -17,6 +18,8 @@ from .panasonic_hc_proto import (
     PanasonicBLEMode,
     PanasonicBLEParcel,
     PanasonicBLEPower,
+    PanasonicBLEPowerReq,
+    PanasonicBLEPowerReqHour,
     PanasonicBLEStatusReq,
     PanasonicBLETemp,
 )
@@ -26,6 +29,7 @@ MAX_TEMP = 32  # FIXME: check these
 
 BLE_CHAR_WRITE = "4d200002-eff3-4362-b090-a04cab3f1da0"
 BLE_CHAR_NOTIFY = "4d200003-eff3-4362-b090-a04cab3f1da0"
+CONSUMPTION_INTERVAL = 300
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,16 +66,20 @@ class PanasonicHC:
     def __init__(self, ble_device: BLEDevice, mac_address: str) -> None:
         """Initialise Panasonic H&C Controller."""
 
+        self.last_update = 0
         self.device = ble_device
         self.mac_address = mac_address
         self._on_update_callbacks: list[Callable] = []
         self._conn: BleakClient = BleakClient(ble_device)
         self._lock = asyncio.Lock()
         self.status = None
+        self.curhour = None
+        self.curindex = None
+        self.consumption = [0] * 48
 
     @property
     def is_connected(self) -> bool:
-        """Return trie if connected to thermostat."""
+        """Return true if connected to thermostat."""
 
         return self._conn.is_connected
 
@@ -107,7 +115,17 @@ class PanasonicHC:
     async def async_get_status(self) -> None:
         """Query current status."""
 
+        # always update status
         await self._async_write_command(PanasonicBLEStatusReq())
+
+        # update consumption if interval has passed
+        now = time.time()
+        if now > self.last_update + CONSUMPTION_INTERVAL:
+            await asyncio.sleep(0.5)
+            await self._async_write_command(PanasonicBLEPowerReq())
+            await asyncio.sleep(0.5)
+            await self._async_write_command(PanasonicBLEPowerReqHour())
+            self.last_update = now
 
     async def _async_write_command(self, command: PanasonicBLEParcel):
         """Write a command to the write characteristic."""
@@ -126,9 +144,10 @@ class PanasonicHC:
     def on_notification(self, handle: BleakGATTCharacteristic, data: bytes) -> None:
         """Handle data from BLE GATT Notifications."""
 
-        _LOGGER.info("Received BLE packet")
         try:
+            do_callback = False
             parcel = PanasonicBLEParcel.parse(data=data)
+            _LOGGER.debug("Received packet data: %s", parcel)
             for packet in parcel:
                 if isinstance(packet, PanasonicBLEParcel.PanasonicBLEPacketStatus):
                     self.status = Status(
@@ -139,8 +158,35 @@ class PanasonicHC:
                         packet.temp,
                         packet.fanspeed.name,
                     )
-                    for callback in self._on_update_callbacks:
-                        callback()
+                    do_callback = True
+                elif isinstance(
+                    packet, PanasonicBLEParcel.PanasonicBLEPacketConsumption
+                ):
+                    if packet.hour is not None:
+                        self.curhour = packet.hour
+                    if packet.index is not None:
+                        self.curindex = packet.index
+                    if packet.values is not None:
+                        for i, value in enumerate(packet.values):
+                            offset = self.curhour + 24 - 1 - self.curindex
+                            if offset < 0:
+                                offset += 48
+                            idx = offset + packet.pos + i
+                            if idx >= 48:
+                                idx -= 48
+                            _LOGGER.debug("Writing %s to index %s", value, idx)
+                            self.consumption[idx] = value
+                        do_callback = True
+
+            _LOGGER.debug(
+                "Consumption: %s, curindex: %s, curhour: %s",
+                self.consumption,
+                self.curindex,
+                self.curhour,
+            )
+            if do_callback:
+                for callback in self._on_update_callbacks:
+                    callback()
         except Exception as e:
             _LOGGER.error("Error parsing packet: %s", e)
 

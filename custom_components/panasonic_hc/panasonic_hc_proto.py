@@ -2,6 +2,10 @@
 
 from enum import Enum
 import io
+import logging
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _cksum(data):
@@ -39,6 +43,10 @@ def _encode(data):
         data[x] = data[x] ^ 105
 
     return bytes(data)
+
+
+def _bytes_to_floats(data):
+    arr = [data[x] << 8 + data[x + 1] for x in range(0, len(data), 2)]
 
 
 class MODE(Enum):
@@ -87,6 +95,9 @@ class PanasonicBLEParcel:
             if ptype == 33:
                 return PanasonicBLEParcel.PanasonicBLEPacketOutdoorTemp(ptype, pdata)
 
+            if ptype == 105 and pdata[0:3] == bytes([2, 0, 19]):
+                return PanasonicBLEParcel.PanasonicBLEPacketConsumption(ptype, pdata)
+
             return PanasonicBLEParcel.PanasonicBLEPacket(ptype, pdata)
 
         def encode(self):
@@ -128,6 +139,26 @@ class PanasonicBLEParcel:
             s = super().__str__()
             s += f"\nOutdoor Temp: {self.temp}"
             return s
+
+    class PanasonicBLEPacketConsumption(PanasonicBLEPacket):
+        def __init__(self, ptype, pdata):
+            self.hour = None
+            self.index = None
+            self.pos = None
+            self.values = None
+
+            super().__init__(ptype, pdata)
+            if pdata[3] == 1:
+                self.hour = pdata[8]
+            elif pdata[3] == 2:
+                self.index = pdata[11]
+            elif pdata[3] >= 3 and pdata[3] <= 14:
+                # convert remaining data to two-byte floats
+                self.pos = (pdata[3] - 3) * 4
+                self.values = [
+                    ((pdata[x + 4] << 8) + (pdata[x + 5] & 255)) / 10
+                    for x in range(0, len(pdata) - 4, 2)
+                ]
 
     class COMPONENT(Enum):
         I_UNIT1 = 1
@@ -257,6 +288,32 @@ class PanasonicBLEStatusReq(PanasonicBLEParcel):
             dst="I_UNIT1",
             op="REQ",
             packets=[PanasonicBLEParcel.PanasonicBLEPacket(129, bytes([4, 0, 14]))],
+        )
+
+
+class PanasonicBLEPowerReq(PanasonicBLEParcel):
+    def __init__(self):
+        super().__init__(
+            src="APP",
+            dst="BLE_MODULE_UART",
+            op="REQ",
+            packets=[
+                PanasonicBLEParcel.PanasonicBLEPacket(105, bytes([2, 0, 19, x, 12]))
+                for x in range(1, 3)
+            ],
+        )
+
+
+class PanasonicBLEPowerReqHour(PanasonicBLEParcel):
+    def __init__(self):
+        super().__init__(
+            src="APP",
+            dst="BLE_MODULE_UART",
+            op="REQ",
+            packets=[
+                PanasonicBLEParcel.PanasonicBLEPacket(105, bytes([2, 0, 19, x, 12]))
+                for x in range(3, 15)
+            ],
         )
 
 

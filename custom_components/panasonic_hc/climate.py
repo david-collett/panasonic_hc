@@ -51,9 +51,9 @@ async def async_setup_entry(
 
 
 class PanasonicHCClimate(ClimateEntity):
-    """Climate entity to represent a eQ-3 thermostat."""
+    """Climate entity to represent a panasonic h&c thermostat."""
 
-    _attr_name = None
+    _attr_name = "Thermostat"
     _attr_has_entity_name = True
     _attr_supported_features = (
         ClimateEntityFeature.TARGET_TEMPERATURE
