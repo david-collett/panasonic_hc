@@ -36,3 +36,19 @@ exit
 If your home assistant uses Bluetooth proxies, it will not currently
 work, and may continually try (and fail) to connect. This may be
 resolved in the future, let me know if you are interested in a solution.
+
+## Installation
+
+The simplest method is using 'HACS':
+
+- Go to HACS / Integrations
+- Click the 3 dots in the top right
+- Select "Custom repositories"
+- Add the repository URL
+- Select category Integration
+- Click ADD
+- Now from HACS / Integrations you can find Panasonic H&C and click Download
+- Restart Home Assistant
+
+Home assistant should now detect compatible Panasonic controllers.
+
