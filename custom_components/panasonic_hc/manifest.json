@@ -7,6 +7,7 @@
   "config_flow": true,
   "dependencies": ["bluetooth_adapters"],
   "documentation": "https://github.com/david-collett/panasonic_hc",
+  "issue_tracker": "https://github.com/david-collett/panasonic_hc/issues",
   "homekit": {},
   "iot_class": "local_polling",
   "requirements": [],
