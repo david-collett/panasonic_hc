@@ -324,7 +324,10 @@ class PanasonicBLETemp(PanasonicBLEParcel):
             src="APP",
             dst="I_UNIT1",
             op="SET",
-            packets=[PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([9, 0, temp, 0]))],
+            packets=[
+                PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([9, 0, temp, 0])),
+                PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([10, 0, temp, 0]))
+            ],
         )
 
 
