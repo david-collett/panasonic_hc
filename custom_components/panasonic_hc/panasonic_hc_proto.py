@@ -254,7 +254,8 @@ class PanasonicBLEFanMode(PanasonicBLEParcel):
             dst="I_UNIT1",
             op="SET",
             packets=[
-                PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([17, mode, 0, 0]))
+                PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([17, mode, 0, 0])),
+                PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([18, mode, 0, 0]))
             ],
         )
 
