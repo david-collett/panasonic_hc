@@ -116,7 +116,7 @@ class PanasonicBLEParcel:
             self.fanspeed = FANSPEED((self.pdata[1] >> 5) & 7)
             self.powersave = self.pdata[-6]
 
-            if len(self.pdata) > 12:
+            if len(self.pdata) >= 6:
                 self.curtemp = (self.pdata[5] - 70) / 2
 
         def __str__(self):
