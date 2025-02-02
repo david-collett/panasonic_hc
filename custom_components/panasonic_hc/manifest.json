@@ -15,7 +15,7 @@
   "zeroconf": [],
   "bluetooth": [
     {
-      "local_name": "CZ-RTC6BLW",
+      "local_name": "CZ-RTC6*",
       "connectable": true
     }
   ],
