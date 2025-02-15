@@ -38,9 +38,9 @@ class PanasonicHCConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors=errors,
             )
 
-        mac_address = format_mac(user_input[CONF_MAC])
+        self.mac_address = format_mac(user_input[CONF_MAC])
 
-        if not validate_mac(mac_address):
+        if not validate_mac(self.mac_address):
             errors[CONF_MAC] = "invalid_mac_address"
             return self.async_show_form(
                 step_id="user",
@@ -48,7 +48,7 @@ class PanasonicHCConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors=errors,
             )
 
-        await self.async_set_unique_id(mac_address)
+        await self.async_set_unique_id(self.mac_address)
         self._abort_if_unique_id_configured(updates=user_input)
 
         return self.async_create_entry(
