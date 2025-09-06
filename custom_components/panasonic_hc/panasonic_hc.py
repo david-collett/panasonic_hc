@@ -5,7 +5,7 @@ from collections.abc import Callable
 import logging
 import time
 
-from bleak import BleakClient
+from bleak_retry_connector import establish_connection, BleakClientWithServiceCache
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.exc import BleakError
@@ -70,7 +70,7 @@ class PanasonicHC:
         self.device = ble_device
         self.mac_address = mac_address
         self._on_update_callbacks: list[Callable] = []
-        self._conn: BleakClient = BleakClient(ble_device)
+        self._conn = None
         self._lock = asyncio.Lock()
         self.status = None
         self.curhour = None
@@ -98,7 +98,11 @@ class PanasonicHC:
         """Connect to thermostat."""
 
         try:
-            await self._conn.connect()
+            self._conn = await establish_connection(
+                BleakClientWithServiceCache,
+                self.device,
+                name=self.device.name or self.device.address
+            )
             await self._conn.start_notify(BLE_CHAR_NOTIFY, self.on_notification)
             await self.async_get_status()
         except (BleakError, TimeoutError) as e:
