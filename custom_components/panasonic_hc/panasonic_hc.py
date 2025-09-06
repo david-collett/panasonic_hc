@@ -156,8 +156,9 @@ class PanasonicHC:
                 if isinstance(packet, PanasonicBLEParcel.PanasonicBLEPacketStatus):
                     # Some packets do not have curtemp at this index, I'm not sure how to
                     # identify them, so we will do some sanity filtering
-                    if not packet.curtemp or abs(packet.curtemp - self.status.curtemp) > 20:
-                        packet.curtemp = self.status.curtemp
+                    if self.status:
+                        if not packet.curtemp or abs(packet.curtemp - self.status.curtemp) > 20:
+                            packet.curtemp = self.status.curtemp
 
                     self.status = Status(
                         packet.power,
