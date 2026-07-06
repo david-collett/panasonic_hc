@@ -16,6 +16,35 @@ It also exposes an energy sensor that can be added to energy dashboard.
 Note that the energy sensor only receives new data hourly for the
 previous hour so it is not entirely accurate in energy dashboard.
 
+### Error codes
+
+Read over the standard control channel (works on any connected controller):
+
+- An **Error code** sensor reporting the active alarm code (e.g. `E04`),
+  `Fault` when the unit signals an alarm whose code is not yet resolved, or
+  `OK` when there is no fault. A plain-English meaning is provided as an
+  attribute.
+- An **Alarm history** sensor exposing the indoor unit's stored fault codes
+  (most recent first) with their meanings.
+
+Alarm codes are decoded to the standard `E/F/H/L/P` (and `A/C/J`) classes.
+
+### Diagnostics (live operating data)
+
+Some controllers additionally expose the diagnosis channel (as used by the
+"Panasonic H&C Diagnosis App"). Where supported, the integration provides:
+
+- A **Firmware** sensor (main + wireless module versions).
+- **Diagnostic sensors** for live operating data: indoor and outdoor coil
+  temperatures (E1/E2/C1/C2), outdoor air temperature (TO), compressor
+  discharge/suction temperatures (TD/TS), compressor frequency, and outdoor
+  unit current.
+
+The diagnosis channel is detected automatically on connect. Many controllers
+only support the firmware query (the module answers other diagnosis commands
+with `NOTSUPPORT`); on those, the live-data sensors stay unavailable while the
+firmware sensor and the control-channel error codes above still work.
+
 ## Installation
 
 The simplest method is using 'HACS':
