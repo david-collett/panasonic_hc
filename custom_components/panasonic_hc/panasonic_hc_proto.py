@@ -88,6 +88,10 @@ class PanasonicBLEParcel:
 
             ptype = fd.read(1)[0]
             plen = fd.read(1)[0]
+
+            if ptype == 0x69 and plen == 0xFE:
+                return PanasonicBLEParcel.PanasonicBLEPacketUARTKeepAlive(ptype, b"")
+
             pdata = fd.read(plen)
 
             if ptype == 129:
@@ -111,13 +115,22 @@ class PanasonicBLEParcel:
             super().__init__(ptype, pdata)
             self.curtemp = 0
             self.power = self.pdata[0] & 1
-            self.mode = MODE((self.pdata[0] >> 5) & 7)
+
+            raw_mode = (self.pdata[0] >> 5) & 7
+
+            if raw_mode == 6:
+                raw_mode = 5 # Some Panasonic devices sent 6 for auto instead of 5
+
+            self.mode = MODE(raw_mode)
             self.temp = (self.pdata[4] - 70) / 2
             self.fanspeed = FANSPEED((self.pdata[1] >> 5) & 7)
-            self.powersave = self.pdata[8]
+            self.powersave = None
 
             if len(self.pdata) >= 6:
                 self.curtemp = (self.pdata[5] - 70) / 2
+
+            if len(self.pdata) >= 9:
+                self.powersave = self.pdata[8]
 
         def __str__(self):
             s = super().__str__()
@@ -131,7 +144,7 @@ class PanasonicBLEParcel:
             return s
 
     class PanasonicBLEPacketOutdoorTemp(PanasonicBLEPacket):
-        def __init__(self):
+        def __init__(self, ptype, pdata):
             super().__init__(ptype, pdata)
             self.temp = self.pdata[1] / 10
 
@@ -159,6 +172,10 @@ class PanasonicBLEParcel:
                     ((pdata[x + 4] << 8) + (pdata[x + 5] & 255)) / 10
                     for x in range(0, len(pdata) - 4, 2)
                 ]
+
+    class PanasonicBLEPacketUARTKeepAlive(PanasonicBLEPacket):
+        """UART keepalive/empty packet (0x69 0xFE)."""
+        pass
 
     class COMPONENT(Enum):
         I_UNIT1 = 1
@@ -255,7 +272,10 @@ class PanasonicBLEFanMode(PanasonicBLEParcel):
             op="SET",
             packets=[
                 PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([17, mode, 0, 0])),
-                PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([18, mode, 0, 0]))
+                PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([18, mode, 0, 0])),
+                PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([19, mode, 0, 0])),
+                PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([20, mode, 0, 0])),
+                PanasonicBLEParcel.PanasonicBLEPacket(76, bytes([21, mode, 0, 0]))
             ],
         )
 

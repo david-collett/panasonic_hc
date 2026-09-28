@@ -42,13 +42,13 @@ class Status:
     """Class representing current HVAC status."""
 
     def __init__(
-        self,
-        power: bool,
-        mode: str,
-        powersave: bool,
-        curtemp: float,
-        settemp: float,
-        fanspeed: str,
+            self,
+            power: bool,
+            mode: str,
+            powersave: bool,
+            curtemp: float,
+            settemp: float,
+            fanspeed: str,
     ) -> None:
         """Initialise Status."""
 
@@ -162,17 +162,19 @@ class PanasonicHC:
                         if not packet.curtemp or abs(packet.curtemp - self.status.curtemp) > 20:
                             packet.curtemp = self.status.curtemp
 
+                    powersave = packet.powersave if packet.powersave is not None else self.status.powersave
+
                     self.status = Status(
                         packet.power,
                         packet.mode.name,
-                        packet.powersave,
+                        powersave,
                         packet.curtemp,
                         packet.temp,
                         packet.fanspeed.name,
                     )
                     do_callback = True
                 elif isinstance(
-                    packet, PanasonicBLEParcel.PanasonicBLEPacketConsumption
+                        packet, PanasonicBLEParcel.PanasonicBLEPacketConsumption
                 ):
                     if packet.hour is not None:
                         self.curhour = packet.hour
