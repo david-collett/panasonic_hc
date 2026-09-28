@@ -65,6 +65,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
+# How often to refresh diagnosis data (error codes + live operating data),
+# in units of the 10s status loop below (i.e. every ~60s).
+DIAG_REFRESH_EVERY = 6
+
+
 async def _async_run_thermostat(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Run the thermostat."""
 
@@ -72,9 +77,15 @@ async def _async_run_thermostat(hass: HomeAssistant, entry: ConfigEntry) -> None
 
     await _async_reconnect_thermostat(hass, entry)
 
+    loops = 0
     while True:
         try:
             await thermostat.async_get_status()
+            if loops % DIAG_REFRESH_EVERY == 0:
+                await thermostat.async_update_alarm_history()
+            if thermostat.diag_realtime_supported and loops % DIAG_REFRESH_EVERY == 0:
+                await thermostat.async_update_diagnostics()
+            loops += 1
         except PanasonicHCException as e:
             if not thermostat.is_connected:
                 _LOGGER.error(

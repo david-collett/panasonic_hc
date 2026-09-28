@@ -64,6 +64,26 @@ class FANSPEED(Enum):
     low = 5
 
 
+# Alarm/error class encoded in the top 3 bits of an alarm byte (from the H&C
+# Control app's AlarmCodeData). Content (number) is the low 5 bits. Class "A"
+# with content 0 means "no error".
+_ALARM_CLASS = {0: "A", 1: "C", 2: "E", 3: "F", 4: "H", 5: "J", 6: "L", 7: "P"}
+
+
+def decode_alarm_byte(b: int) -> str | None:
+    """Decode a control-channel alarm byte to a code (e.g. "E04"), or None.
+
+    Matches the Control app: class = (b >> 5) & 7, number = b & 0x1F,
+    formatted "%s%02d". No-fault ("A00") returns None.
+    """
+
+    cls = _ALARM_CLASS.get((b >> 5) & 7)
+    num = b & 0x1F
+    if cls is None or (cls == "A" and num == 0):
+        return None
+    return f"{cls}{num:02d}"
+
+
 class PanasonicBLEParcel:
     """A BLE Parcel."""
 
@@ -88,7 +108,10 @@ class PanasonicBLEParcel:
 
             ptype = fd.read(1)[0]
             plen = fd.read(1)[0]
-            pdata = fd.read(plen)
+            # 0xFF (Busy) and 0xFE (NAck) are sentinel lengths with no payload;
+            # treating them as a real length reads bogus/short data and derails
+            # parsing of the rest of the parcel.
+            pdata = b"" if plen in (0xFE, 0xFF) else fd.read(plen)
 
             if ptype == 129:
                 return PanasonicBLEParcel.PanasonicBLEPacketStatus(ptype, pdata)
@@ -97,6 +120,14 @@ class PanasonicBLEParcel:
 
             if ptype == 105 and pdata[0:3] == bytes([2, 0, 19]):
                 return PanasonicBLEParcel.PanasonicBLEPacketConsumption(ptype, pdata)
+
+            # Active alarm code: cm 105 generic read, fn=27 (0x1B), dn=5.
+            if ptype == 105 and len(pdata) >= 5 and pdata[2] == 27 and pdata[3] == 5:
+                return PanasonicBLEParcel.PanasonicBLEPacketAlarm(ptype, pdata)
+
+            # Alarm history: cm 39, alarm byte at pdata[2].
+            if ptype == 39 and len(pdata) >= 3:
+                return PanasonicBLEParcel.PanasonicBLEPacketAlarmHistory(ptype, pdata)
 
             return PanasonicBLEParcel.PanasonicBLEPacket(ptype, pdata)
 
@@ -115,6 +146,8 @@ class PanasonicBLEParcel:
             self.temp = (self.pdata[4] - 70) / 2
             self.fanspeed = FANSPEED((self.pdata[1] >> 5) & 7)
             self.powersave = self.pdata[8]
+            # Alarm-active flag (data[7] != 0), per the Control app.
+            self.alarm_occurred = bool(self.pdata[7]) if len(self.pdata) > 7 else False
 
             if len(self.pdata) >= 6:
                 self.curtemp = (self.pdata[5] - 70) / 2
@@ -130,10 +163,27 @@ class PanasonicBLEParcel:
             s += f'\nPowersave: { "on" if self.powersave else "off" }'
             return s
 
-    class PanasonicBLEPacketOutdoorTemp(PanasonicBLEPacket):
-        def __init__(self):
+    class PanasonicBLEPacketAlarm(PanasonicBLEPacket):
+        """Active alarm code response (cm 105, fn=27, dn=5).
+
+        The alarm byte is the read payload at pdata[4].
+        """
+
+        def __init__(self, ptype, pdata):
             super().__init__(ptype, pdata)
-            self.temp = self.pdata[1] / 10
+            self.alarm_code = decode_alarm_byte(pdata[4]) if len(pdata) >= 5 else None
+
+    class PanasonicBLEPacketAlarmHistory(PanasonicBLEPacket):
+        """Alarm-history response (cm 39). Alarm byte at pdata[2]."""
+
+        def __init__(self, ptype, pdata):
+            super().__init__(ptype, pdata)
+            self.alarm_code = decode_alarm_byte(pdata[2]) if len(pdata) >= 3 else None
+
+    class PanasonicBLEPacketOutdoorTemp(PanasonicBLEPacket):
+        def __init__(self, ptype, pdata):
+            super().__init__(ptype, pdata)
+            self.temp = self.pdata[1] / 10 if len(self.pdata) >= 2 else None
 
         def __str__(self):
             s = super().__str__()
@@ -341,4 +391,31 @@ class PanasonicBLEOuting(PanasonicBLEParcel):
             packets=[
                 PanasonicBLEParcel.PanasonicBLEPacket(105, bytes([0, 0, 17, 2, state]))
             ],
+        )
+
+
+class PanasonicBLEAlarmReq(PanasonicBLEParcel):
+    """Request the active alarm code (cm 105 generic read, fn=27, dn=5)."""
+
+    def __init__(self):
+        super().__init__(
+            src="APP",
+            dst="BLE_MODULE_UART",
+            op="REQ",
+            packets=[PanasonicBLEParcel.PanasonicBLEPacket(105, bytes([2, 0, 27, 5, 5]))],
+        )
+
+
+class PanasonicBLEAlarmHistoryReq(PanasonicBLEParcel):
+    """Request an alarm-history slot (cm 39) from the indoor unit.
+
+    ``index`` selects the history slot (1 = most recent).
+    """
+
+    def __init__(self, index: int = 1):
+        super().__init__(
+            src="APP",
+            dst="I_UNIT1",
+            op="REQ",
+            packets=[PanasonicBLEParcel.PanasonicBLEPacket(39, bytes([index, 3]))],
         )
